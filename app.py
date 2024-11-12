@@ -30,13 +30,19 @@ from tensorflow.keras.preprocessing import image
 # Flask utils
 from flask import Flask, redirect, url_for, request, render_template
 from werkzeug.utils import secure_filename
+from flask import Response
 #from gevent.pywsgi import WSGIServer
+import sys
+import os
 
+# Set default encoding to UTF-8
+if sys.platform == "win32":
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
 # Define a flask app
 app = Flask(__name__)
 
 # Model saved with Keras model.save()
-MODEL_PATH ='/home/akhil/Downloads/deep_learning/Real-Forge/forge_real_signature_model.h5'
+MODEL_PATH ='Real-Forge-Signature-Detection/forge_real_signature_model3.h5'
 
 # Load your trained model
 model = load_model(MODEL_PATH)
@@ -50,32 +56,27 @@ def model_predict(img_path, model):
 
     # Preprocessing the image
     x = image.img_to_array(img)
-    # x = np.true_divide(x, 255)
-    ## Scaling
-    x=x/255
+    x = x / 255
     x = np.expand_dims(x, axis=0)
-   
-
-    # Be careful how your trained model deals with the input
-    # otherwise, it won't make correct prediction!
-   # x = preprocess_input(x)
 
     preds = model.predict(x)
-    preds=np.argmax(preds, axis=1)
-    if preds==0:
-        preds="THE SIGNATURE IS FRAUDULENT"
+    preds = np.argmax(preds, axis=1)
+    
+    # Prepare the result based on prediction
+    if preds == 0:
+        preds = "THE SIGNATURE IS FRAUDULENT"
     else:
-        preds="THE SIGNATURE IS ORIGINAL"
+        preds = "THE SIGNATURE IS ORIGINAL"
         
-    
-    
-    return preds
+    # Ensure the result is a string
+    return str(preds)
 
 
 @app.route('/', methods=['GET'])
 def index():
     # Main page
     return render_template('index.html')
+
 
 
 @app.route('/predict', methods=['GET', 'POST'])
@@ -86,14 +87,19 @@ def upload():
 
         # Save the file to ./uploads
         basepath = os.path.dirname(__file__)
-        file_path = os.path.join(
-            basepath, 'uploads', secure_filename(f.filename))
+        upload_folder = os.path.join(basepath, 'uploads')
+
+        if not os.path.exists(upload_folder):
+            os.makedirs(upload_folder)
+
+        file_path = os.path.join(upload_folder, secure_filename(f.filename))
         f.save(file_path)
 
         # Make prediction
         preds = model_predict(file_path, model)
-        result=preds
-        return result
+
+        # Return result as a response with UTF-8 encoding
+        return Response(preds, content_type='text/plain; charset=utf-8')
     return None
 
 
